@@ -236,3 +236,34 @@ export function downloadTextFile({
   link.remove()
   URL.revokeObjectURL(url)
 }
+
+export function buildParticipantsCsv(
+  participants: {
+    name: string
+    company: string
+    email: string
+    groupName: string
+    joinedAt: string
+  }[]
+) {
+  const headers = ["Namn", "Företag", "E-post", "Grupp", "Registrerad"]
+
+  const rows = participants.map((participant) => [
+    participant.name,
+    participant.company,
+    participant.email,
+    participant.groupName,
+    participant.joinedAt,
+  ])
+
+  return [headers, ...rows]
+    .map((row) =>
+      row
+        .map((cell) => {
+          const value = String(cell ?? "")
+          return `"${value.replace(/"/g, '""')}"`
+        })
+        .join(",")
+    )
+    .join("\n")
+}

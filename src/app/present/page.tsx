@@ -19,6 +19,10 @@ import { Progress } from "@/components/ui/progress"
 
 export default function PresentPage() {
   const { state, groups, realtimeStatus, error } = useSupabaseWorkshopState()
+  const totalParticipants = groups.reduce(
+  (total, group) => total + group.participants,
+  0
+  )
   const [origin, setOrigin] = useState("")
 
   useEffect(() => {
@@ -97,6 +101,10 @@ export default function PresentPage() {
                   {groups.length} grupper
                 </Badge>
               </div>
+
+                <Badge className="rounded-full bg-white/10 px-4 py-2 text-slate-200 hover:bg-white/10">
+                {totalParticipants} registrerade deltagare
+                </Badge>
 
               {error && (
                 <p className="mt-4 rounded-2xl border border-red-400/20 bg-red-500/10 p-4 text-sm text-red-200">

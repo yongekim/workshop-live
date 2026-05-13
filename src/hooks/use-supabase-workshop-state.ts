@@ -28,7 +28,7 @@ type EventRow = {
   subtitle: string | null
   description: string
   event_date: string | null
-  status: string
+  status: "draft" | "active" | "completed" | "archived"
   moderator_questions: string[] | null
   common_themes: string[] | null
   updated_at: string
@@ -191,10 +191,11 @@ function mapRowsToState(
 
   return {
     event: {
-      name: eventRow.name,
-      subtitle: eventRow.subtitle ?? "",
-      date: eventRow.event_date ?? "Demo-event",
-      description: eventRow.description,
+        name: eventRow.name,
+        subtitle: eventRow.subtitle ?? "",
+        date: eventRow.event_date ?? "Demo-event",
+        description: eventRow.description,
+        status: eventRow.status,
     },
     groups,
     moderatorQuestions: eventRow.moderator_questions ?? [],

@@ -6,15 +6,18 @@ import {
   ArrowLeft,
   CheckCircle2,
   Copy,
+  Download,
   Plus,
   RefreshCcw,
   Save,
   Trash2,
+  Users,
 } from "lucide-react"
 
 import { useSupabaseWorkshopState } from "@/hooks/use-supabase-workshop-state"
+import { buildParticipantsCsv, downloadTextFile } from "@/lib/report/report-builder"
 import { createSupabaseBrowserClient } from "@/lib/supabase/client"
-import type { GroupStatus } from "@/types/workshop"
+import type { EventStatus, GroupStatus } from "@/types/workshop"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -29,6 +32,15 @@ import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
 
 const DEMO_EVENT_SLUG = "affarsresans-ekosystem"
+
+type ParticipantListItem = {
+  id: string
+  name: string
+  company: string
+  email: string
+  groupName: string
+  joinedAt: string
+}
 
 function slugify(value: string) {
   return value
@@ -63,6 +75,7 @@ export default function AdminPage() {
   const [eventName, setEventName] = useState("")
   const [eventSubtitle, setEventSubtitle] = useState("")
   const [eventDescription, setEventDescription] = useState("")
+  const [eventStatus, setEventStatus] = useState<EventStatus>("active")
   const [moderatorQuestions, setModeratorQuestions] = useState("")
   const [commonThemes, setCommonThemes] = useState("")
   const [statusMessage, setStatusMessage] = useState("")
@@ -72,12 +85,16 @@ export default function AdminPage() {
   const [newGroupTitle, setNewGroupTitle] = useState("")
   const [newGroupDescription, setNewGroupDescription] = useState("")
 
+  const [participants, setParticipants] = useState<ParticipantListItem[]>([])
+  const [isLoadingParticipants, setIsLoadingParticipants] = useState(false)
+
   useEffect(() => {
     if (!state) return
 
     setEventName(state.event.name)
     setEventSubtitle(state.event.subtitle)
     setEventDescription(state.event.description)
+    setEventStatus(state.event.status ?? "active")
     setModeratorQuestions(state.moderatorQuestions.join("\n"))
     setCommonThemes(state.commonThemes.join("\n"))
   }, [state])
@@ -85,6 +102,18 @@ export default function AdminPage() {
   async function copyToClipboard(value: string) {
     await navigator.clipboard.writeText(value)
     setStatusMessage("Länk kopierad.")
+  }
+
+  async function getEventId() {
+    const { data, error } = await supabase
+      .from("events")
+      .select("id")
+      .eq("slug", DEMO_EVENT_SLUG)
+      .single()
+
+    if (error) throw error
+
+    return data.id as string
   }
 
   async function saveEventSettings() {
@@ -99,6 +128,7 @@ export default function AdminPage() {
           name: eventName,
           subtitle: eventSubtitle,
           description: eventDescription,
+          status: eventStatus,
           moderator_questions: linesToArray(moderatorQuestions),
           common_themes: linesToArray(commonThemes),
         })
@@ -113,6 +143,111 @@ export default function AdminPage() {
         caughtError instanceof Error
           ? caughtError.message
           : "Kunde inte spara eventinställningar."
+
+      setAdminError(message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  async function loadParticipants() {
+    try {
+      setIsLoadingParticipants(true)
+      setAdminError("")
+      setStatusMessage("")
+
+      const eventId = await getEventId()
+
+      const { data, error } = await supabase
+        .from("participants")
+        .select("id,name,company,email,group_id,joined_at")
+        .eq("event_id", eventId)
+        .order("joined_at", { ascending: false })
+
+      if (error) throw error
+
+      const mapped = (data ?? []).map((participant) => {
+        const group = groups.find((item) => item.dbId === participant.group_id)
+
+        return {
+          id: participant.id,
+          name: participant.name,
+          company: participant.company,
+          email: participant.email,
+          groupName: group?.name ?? "Ingen grupp",
+          joinedAt: new Intl.DateTimeFormat("sv-SE", {
+            dateStyle: "short",
+            timeStyle: "short",
+          }).format(new Date(participant.joined_at)),
+        }
+      })
+
+      setParticipants(mapped)
+      setStatusMessage("Deltagarlistan uppdaterad.")
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Kunde inte hämta deltagarlistan."
+
+      setAdminError(message)
+    } finally {
+      setIsLoadingParticipants(false)
+    }
+  }
+
+  function exportParticipants() {
+    downloadTextFile({
+      filename: "workshop-deltagare.csv",
+      content: buildParticipantsCsv(participants),
+      mimeType: "text/csv;charset=utf-8",
+    })
+  }
+
+  async function clearWorkshopData() {
+    const confirmed = window.confirm(
+      "Detta rensar deltagare, gruppsvar, insiktskort, röster och rapportversioner. Event och grupper behålls. Vill du fortsätta?"
+    )
+
+    if (!confirmed) return
+
+    try {
+      setIsSaving(true)
+      setAdminError("")
+      setStatusMessage("")
+
+      const eventId = await getEventId()
+      const groupDbIds = groups
+        .map((group) => group.dbId)
+        .filter((value): value is string => Boolean(value))
+
+      if (groupDbIds.length > 0) {
+        await supabase.from("votes").delete().neq("id", "00000000-0000-0000-0000-000000000000")
+        await supabase.from("insight_cards").delete().in("group_id", groupDbIds)
+        await supabase.from("responses").delete().in("group_id", groupDbIds)
+        await supabase
+          .from("workshop_groups")
+          .update({
+            status: "Inte startad",
+            participants: 0,
+            progress: 0,
+            last_saved_at: null,
+            ready_at: null,
+          })
+          .in("id", groupDbIds)
+      }
+
+      await supabase.from("participants").delete().eq("event_id", eventId)
+      await supabase.from("report_snapshots").delete().eq("event_id", eventId)
+
+      setParticipants([])
+      await syncNow(false)
+      setStatusMessage("Workshopdata rensad. Event och grupper är kvar.")
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Kunde inte rensa workshopdata."
 
       setAdminError(message)
     } finally {
@@ -182,14 +317,7 @@ export default function AdminPage() {
         return
       }
 
-      const { data: eventData, error: eventError } = await supabase
-        .from("events")
-        .select("id")
-        .eq("slug", DEMO_EVENT_SLUG)
-        .single()
-
-      if (eventError) throw eventError
-
+      const eventId = await getEventId()
       const nextNumber = groups.length + 1
       const slugBase = slugify(title) || `grupp-${nextNumber}`
       const slug = `${slugBase}-${Date.now().toString().slice(-5)}`
@@ -198,7 +326,7 @@ export default function AdminPage() {
       const { error: groupError } = await supabase
         .from("workshop_groups")
         .insert({
-          event_id: eventData.id,
+          event_id: eventId,
           slug,
           name: `Grupp ${nextNumber}`,
           access_code: accessCode,
@@ -231,7 +359,7 @@ export default function AdminPage() {
     if (!dbId) return
 
     const confirmed = window.confirm(
-      "Vill du verkligen radera gruppen? Svar och insiktskort kopplade till gruppen raderas också."
+      "Vill du verkligen radera gruppen? Svar, deltagare och insiktskort kopplade till gruppen raderas också."
     )
 
     if (!confirmed) return
@@ -248,6 +376,7 @@ export default function AdminPage() {
       if (error) throw error
 
       await syncNow(false)
+      await loadParticipants()
       setStatusMessage("Grupp raderad.")
     } catch (caughtError) {
       const message =
@@ -314,15 +443,19 @@ export default function AdminPage() {
                   ? "ansluter"
                   : "frånkopplad"}
             </Badge>
+
+            <Badge className="rounded-full bg-white/10 px-4 py-2 text-slate-200 hover:bg-white/10">
+              Eventstatus: {eventStatus}
+            </Badge>
           </div>
 
           <h1 className="text-4xl font-semibold tracking-tight md:text-6xl">
-            Styr eventet från ett ställe
+            Event Control Center
           </h1>
 
           <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">
-            Här kan du förbereda workshopen, justera grupper och skapa ett
-            tydligare eventflöde inför genomförandet.
+            Förbered eventet, hantera grupper, exportera deltagare och rensa
+            testdata inför skarp körning.
           </p>
 
           {(adminError || workshopError || statusMessage) && (
@@ -348,6 +481,22 @@ export default function AdminPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div>
+                  <p className="mb-2 text-sm text-slate-300">Eventstatus</p>
+                  <select
+                    value={eventStatus}
+                    onChange={(event) =>
+                      setEventStatus(event.target.value as EventStatus)
+                    }
+                    className="w-full rounded-md border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-white"
+                  >
+                    <option value="draft">draft</option>
+                    <option value="active">active</option>
+                    <option value="completed">completed</option>
+                    <option value="archived">archived</option>
+                  </select>
+                </div>
+
                 <div>
                   <p className="mb-2 text-sm text-slate-300">Eventnamn</p>
                   <Input
@@ -412,6 +561,26 @@ export default function AdminPage() {
               </CardContent>
             </Card>
 
+            <Card className="border-red-400/20 bg-red-500/10 text-white">
+              <CardHeader>
+                <CardTitle>Inför skarp körning</CardTitle>
+                <CardDescription className="text-red-100/80">
+                  Rensa testdata men behåll event, grupper och frågor.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button
+                  variant="destructive"
+                  className="w-full rounded-full"
+                  onClick={clearWorkshopData}
+                  disabled={isSaving}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Rensa workshopdata
+                </Button>
+              </CardContent>
+            </Card>
+
             <Card className="border-white/10 bg-white/[0.06] text-white">
               <CardHeader>
                 <CardTitle>Snabblänkar</CardTitle>
@@ -425,6 +594,7 @@ export default function AdminPage() {
                   { label: "Storbildsvy", href: "/present" },
                   { label: "Moderatorvy", href: "/moderator" },
                   { label: "Rapportvy", href: "/report/demo" },
+                  { label: "Event check", href: "/event-check" },
                 ].map((link) => (
                   <div
                     key={link.href}
@@ -456,6 +626,72 @@ export default function AdminPage() {
           </aside>
 
           <div className="space-y-6">
+            <Card className="border-white/10 bg-white/[0.06] text-white">
+              <CardHeader>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <CardTitle>Deltagare</CardTitle>
+                    <CardDescription className="text-slate-400">
+                      Registrerade deltagare från deltagarflödet.
+                    </CardDescription>
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    <Button
+                      variant="secondary"
+                      className="rounded-full"
+                      onClick={loadParticipants}
+                      disabled={isLoadingParticipants}
+                    >
+                      <Users className="mr-2 h-4 w-4" />
+                      Hämta deltagare
+                    </Button>
+
+                    <Button
+                      variant="secondary"
+                      className="rounded-full"
+                      onClick={exportParticipants}
+                      disabled={participants.length === 0}
+                    >
+                      <Download className="mr-2 h-4 w-4" />
+                      Exportera CSV
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-3">
+                {participants.length > 0 ? (
+                  participants.map((participant) => (
+                    <div
+                      key={participant.id}
+                      className="grid gap-2 rounded-2xl border border-white/10 bg-slate-950/50 p-4 md:grid-cols-[1fr_1fr_1fr_auto]"
+                    >
+                      <div>
+                        <p className="font-medium">{participant.name}</p>
+                        <p className="text-xs text-slate-400">
+                          {participant.email}
+                        </p>
+                      </div>
+                      <p className="text-sm text-slate-300">
+                        {participant.company}
+                      </p>
+                      <p className="text-sm text-slate-300">
+                        {participant.groupName}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        {participant.joinedAt}
+                      </p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm leading-6 text-slate-400">
+                    Klicka “Hämta deltagare” för att se deltagarlistan.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
             <Card className="border-white/10 bg-white/[0.06] text-white">
               <CardHeader>
                 <CardTitle>Skapa ny grupp</CardTitle>

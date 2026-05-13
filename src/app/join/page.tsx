@@ -209,6 +209,22 @@ export default function JoinPage() {
     )
   }
 
+  if (state.event.status && state.event.status !== "active") {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
+        <Card className="max-w-xl border-white/10 bg-white/[0.06] text-white">
+          <CardHeader>
+            <CardTitle>Workshopen är inte öppen just nu</CardTitle>
+            <CardDescription className="text-slate-400">
+              Eventstatus är {state.event.status}. Kontakta arrangören om du
+              tror att detta är fel.
+            </CardDescription>
+          </CardHeader>
+        </Card>
+      </main>
+    )
+  }
+
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-8 text-white">
       <section className="mx-auto max-w-6xl">

@@ -65,6 +65,7 @@ export type WorkshopEvent = {
   subtitle: string
   date: string
   description: string
+  status?: EventStatus
 }
 
 export type WorkshopState = {
@@ -107,4 +108,17 @@ export type ReportSnapshot = {
   title: string
   reportMarkdown: string
   createdAt: string
+}
+
+export type EventStatus = "draft" | "active" | "completed" | "archived"
+
+export type Participant = {
+  id: string
+  eventId: string
+  groupId: string | null
+  participantSessionId: string
+  name: string
+  company: string
+  email: string
+  joinedAt: string
 }
