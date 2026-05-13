@@ -32,8 +32,14 @@ export function proxy(request: NextRequest) {
   const isAdmin = hasCookie(request, ADMIN_COOKIE)
   const isModerator = hasCookie(request, MODERATOR_COOKIE)
 
-  if (pathname.startsWith("/admin") || pathname.startsWith("/event-check")) {
-    if (!isAdmin) {
+  if (
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/events") ||
+    pathname.startsWith("/designer") ||
+    pathname.startsWith("/event-check")
+  ) {
+
+  if (!isAdmin) {
       return redirectToAccess({ request, mode: "admin" })
     }
   }
@@ -54,6 +60,8 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/admin/:path*",
+    "/events/:path*",
+    "/designer/:path*",
     "/event-check/:path*",
     "/moderator/:path*",
     "/report/:path*",

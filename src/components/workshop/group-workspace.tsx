@@ -49,6 +49,7 @@ function formatTime(value?: string) {
 
 export function GroupWorkspace({ groupId }: GroupWorkspaceProps) {
   const {
+    eventSlug,
     state,
     error,
     realtimeStatus,
@@ -90,7 +91,7 @@ export function GroupWorkspace({ groupId }: GroupWorkspaceProps) {
           </CardHeader>
           <CardContent>
             <Button asChild className="rounded-full">
-              <Link href="/join">Till gruppval</Link>
+              <Link href={`/join?event=${eventSlug}`}>Till gruppval</Link>
             </Button>
           </CardContent>
         </Card>
@@ -99,6 +100,12 @@ export function GroupWorkspace({ groupId }: GroupWorkspaceProps) {
   }
 
   const activeGroup = group
+  const activeQuestions =
+    state.questions.length > 0 ? state.questions : responseConfigs
+  const improvementKey =
+    activeQuestions.find((question) => question.key === "improvements")?.key ??
+    activeQuestions[activeQuestions.length - 1]?.key ??
+    "improvements"
 
   async function runAiAssist(action: AiAction) {
     try {
@@ -182,12 +189,12 @@ export function GroupWorkspace({ groupId }: GroupWorkspaceProps) {
   function appendSuggestionToImprovements() {
     if (!assistantSuggestion.trim()) return
 
-    const current = activeGroup.responses.improvements.trim()
+    const current = activeGroup.responses[improvementKey]?.trim() ?? ""
     const nextValue = current
       ? `${current}\n\n${assistantTitle}\n${assistantSuggestion}`
       : `${assistantTitle}\n${assistantSuggestion}`
 
-    updateGroupResponse(activeGroup.id, "improvements", nextValue)
+    updateGroupResponse(activeGroup.id, improvementKey, nextValue)
   }
 
   return (
@@ -199,7 +206,7 @@ export function GroupWorkspace({ groupId }: GroupWorkspaceProps) {
             variant="ghost"
             className="mb-6 text-slate-300 hover:bg-white/10 hover:text-white"
           >
-            <Link href="/join">
+            <Link href={`/join?event=${eventSlug}`}>
               <ArrowLeft className="mr-2 h-4 w-4" />
               Tillbaka till gruppval
             </Link>
@@ -300,7 +307,7 @@ export function GroupWorkspace({ groupId }: GroupWorkspaceProps) {
 
         <div className="grid gap-6 lg:grid-cols-[1fr_400px]">
           <div className="space-y-5">
-            {responseConfigs.map((config) => (
+            {activeQuestions.map((config) => (
               <Card
                 key={config.key}
                 className="border-white/10 bg-white/[0.06] text-white"
@@ -315,7 +322,7 @@ export function GroupWorkspace({ groupId }: GroupWorkspaceProps) {
                   <Textarea
                     className="min-h-40 border-white/10 bg-slate-950/80 text-white placeholder:text-slate-500"
                     placeholder={config.placeholder}
-                    value={activeGroup.responses[config.key]}
+                    value={activeGroup.responses[config.key] ?? ""}
                     onChange={(event) =>
                       updateGroupResponse(
                         activeGroup.id,

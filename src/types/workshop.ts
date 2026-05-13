@@ -3,16 +3,22 @@ export type GroupStatus =
   | "Aktiv"
   | "Redo för sammanfattning"
 
+export type EventStatus = "draft" | "active" | "completed" | "archived"
+
 export type ImpactLevel = "Låg" | "Medel" | "Hög"
 export type DifficultyLevel = "Låg" | "Medel" | "Hög"
 
-export type ResponseKey = "currentState" | "friction" | "improvements"
+export type ResponseKey = string
 
 export type WorkshopResponseConfig = {
+  dbId?: string
   key: ResponseKey
   title: string
   description: string
   placeholder: string
+  sortOrder?: number
+  isRequired?: boolean
+  helperText?: string
 }
 
 export type InsightCard = {
@@ -61,6 +67,8 @@ export type WorkshopGroup = {
 }
 
 export type WorkshopEvent = {
+  dbId?: string
+  slug?: string
   name: string
   subtitle: string
   date: string
@@ -71,6 +79,7 @@ export type WorkshopEvent = {
 export type WorkshopState = {
   event: WorkshopEvent
   groups: WorkshopGroup[]
+  questions: WorkshopResponseConfig[]
   moderatorQuestions: string[]
   commonThemes: string[]
   updatedAt: string
@@ -109,8 +118,6 @@ export type ReportSnapshot = {
   reportMarkdown: string
   createdAt: string
 }
-
-export type EventStatus = "draft" | "active" | "completed" | "archived"
 
 export type Participant = {
   id: string

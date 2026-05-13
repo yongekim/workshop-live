@@ -39,6 +39,7 @@ function formatTime(value?: string) {
 
 export default function ModeratorPage() {
   const {
+    eventSlug,
     state,
     groups,
     allInsights,
@@ -184,7 +185,7 @@ export default function ModeratorPage() {
             </Button>
 
             <Button asChild className="rounded-full" variant="secondary">
-              <Link href="/report/demo">Visa rapportvy</Link>
+            <Link href={`/report/demo?event=${eventSlug}`}>Visa rapportvy</Link>
             </Button>
           </div>
         </div>

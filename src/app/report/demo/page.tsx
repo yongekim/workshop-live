@@ -45,8 +45,8 @@ type ReportSnapshotRow = {
 }
 
 export default function DemoReportPage() {
-  const { state, groups, allInsights, resetWorkshop, error } =
-    useSupabaseWorkshopState()
+  const { eventSlug, state, groups, allInsights, resetWorkshop, error } =
+  useSupabaseWorkshopState()
 
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
 
@@ -128,7 +128,7 @@ export default function DemoReportPage() {
       const { data: eventData, error: eventError } = await supabase
         .from("events")
         .select("id")
-        .eq("slug", DEMO_EVENT_SLUG)
+        .eq("slug", eventSlug)
         .single()
 
       if (eventError) throw eventError
@@ -177,7 +177,7 @@ export default function DemoReportPage() {
       const { data: eventData, error: eventError } = await supabase
         .from("events")
         .select("id")
-        .eq("slug", DEMO_EVENT_SLUG)
+        .eq("slug", eventSlug)
         .single()
 
       if (eventError) throw eventError

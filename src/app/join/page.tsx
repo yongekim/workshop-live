@@ -30,7 +30,7 @@ const DEMO_EVENT_SLUG = "affarsresans-ekosystem"
 export default function JoinPage() {
   const router = useRouter()
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
-  const { state, groups, error, isLoading, syncNow } =
+  const { eventSlug, state, groups, error, isLoading, syncNow } =
     useSupabaseWorkshopState()
 
   const [origin, setOrigin] = useState("")
@@ -57,7 +57,7 @@ export default function JoinPage() {
     }
   }, [])
 
-  const joinUrl = origin ? `${origin}/join` : "/join"
+  const joinUrl = origin ? `${origin}/join?event=${eventSlug}` : `/join?event=${eventSlug}`
 
   const isProfileComplete =
     name.trim().length > 1 &&
@@ -155,7 +155,7 @@ export default function JoinPage() {
       }
 
       await syncNow(false)
-      router.push(`/group/${group.id}`)
+      router.push(`/group/${group.id}?event=${eventSlug}`)
     } catch (caughtError) {
       const message =
         caughtError instanceof Error

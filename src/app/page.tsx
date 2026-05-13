@@ -129,9 +129,9 @@ export default function Home() {
                 variant="outline"
                 className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
               >
-                <Link href="/admin">Admin</Link>
+                <Link href="/events">Events</Link>
               </Button>
-
+              
               <Button
                 asChild
                 size="lg"

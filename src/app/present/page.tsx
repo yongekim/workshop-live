@@ -18,7 +18,7 @@ import {
 import { Progress } from "@/components/ui/progress"
 
 export default function PresentPage() {
-  const { state, groups, realtimeStatus, error } = useSupabaseWorkshopState()
+  const { eventSlug, state, groups, realtimeStatus, error } = useSupabaseWorkshopState()
   const totalParticipants = groups.reduce(
   (total, group) => total + group.participants,
   0
@@ -37,7 +37,7 @@ export default function PresentPage() {
     )
   }
 
-  const joinUrl = origin ? `${origin}/join` : "/join"
+  const joinUrl = origin ? `${origin}/join?event=${eventSlug}` : `/join?event=${eventSlug}`
 
   return (
     <main className="min-h-screen bg-slate-950 px-6 py-8 text-white">

@@ -6,6 +6,8 @@ import type {
   WorkshopState,
 } from "@/types/workshop"
 
+export const DEFAULT_EVENT_SLUG = "affarsresans-ekosystem"
+
 export const responseConfigs: WorkshopResponseConfig[] = [
   {
     key: "currentState",
@@ -14,6 +16,8 @@ export const responseConfigs: WorkshopResponseConfig[] = [
       "Hur fungerar detta idag från kundens, resebyråns och leverantörens perspektiv?",
     placeholder:
       "Beskriv hur processen fungerar idag, vilka parter som är inblandade och vad som brukar hända i praktiken...",
+    sortOrder: 1,
+    isRequired: true,
   },
   {
     key: "friction",
@@ -22,6 +26,8 @@ export const responseConfigs: WorkshopResponseConfig[] = [
       "Var går det långsamt, blir fel, skapar osäkerhet eller kräver manuell hantering?",
     placeholder:
       "Beskriv var friktionen uppstår, vem som påverkas och vad konsekvensen blir...",
+    sortOrder: 2,
+    isRequired: true,
   },
   {
     key: "improvements",
@@ -30,13 +36,17 @@ export const responseConfigs: WorkshopResponseConfig[] = [
       "Vilka idéer skulle göra störst skillnad för Travel Manager, resenärer, resebyråer och leverantörer?",
     placeholder:
       "Skriv konkreta förbättringsförslag, möjliga ägare och nästa steg...",
+    sortOrder: 3,
+    isRequired: true,
   },
 ]
 
 export const workshopEvent = {
+  slug: DEFAULT_EVENT_SLUG,
   name: "Affärsresans ekosystem",
   subtitle: "Business Travel Insight Lab",
   date: "Demo-event",
+  status: "active" as const,
   description:
     "En AI-stödd workshop där leverantörer och resebyråer tillsammans identifierar friktion, möjligheter och konkreta förbättringar för Travel Managers och affärsresenärer.",
 }
@@ -117,24 +127,6 @@ export const initialGroups: WorkshopGroup[] = [
           "Ta fram ett första utkast och testa med en pilotkund och två leverantörer.",
         votes: 3,
       }),
-      createInsightCard("neg-rates", {
-        id: "insight-neg-rates-ownership",
-        title: "Tydligare processägarskap",
-        problem:
-          "Det är otydligt vem som ansvarar för instruktion, laddning, verifiering och uppföljning.",
-        consequence:
-          "Problem upptäcks ofta först när bokningen ska göras eller när kunden följer upp i efterhand.",
-        rootCause:
-          "Processen är uppdelad mellan kund, resebyrå, leverantör och teknisk support.",
-        idea:
-          "Definiera tydliga roller i processen och skapa en gemensam ansvarsmatris.",
-        impact: "Hög",
-        difficulty: "Medel",
-        suggestedOwner: "Resebyrå + leverantör",
-        nextStep:
-          "Kartlägg nuvarande ansvarsfördelning för hotell, flyg och tåg var för sig.",
-        votes: 2,
-      }),
     ],
   },
   {
@@ -155,26 +147,7 @@ export const initialGroups: WorkshopGroup[] = [
       improvements:
         "Skapa en tydligare kontrollvy där Travel Manager kan se avtalstrohet, policyavvikelser och betalflöde på en mer samlad nivå.",
     },
-    insights: [
-      createInsightCard("travel-manager-control", {
-        id: "insight-tm-control-view",
-        title: "Bättre kontrollvy för avtalsanvändning",
-        problem:
-          "Travel Manager saknar ofta en enkel överblick över om avtal, policy och betalflöde fungerar som tänkt.",
-        consequence:
-          "Det blir svårare att styra kostnad, följa upp avtalstrohet och förklara avvikelser internt.",
-        rootCause:
-          "Data finns ofta utspridd mellan bokningssystem, leverantör, resebyrå och betalpartner.",
-        idea:
-          "Identifiera den minsta datamängd Travel Manager behöver för att följa upp avtalstrohet.",
-        impact: "Hög",
-        difficulty: "Hög",
-        suggestedOwner: "Resebyrå + betalpartner + leverantörer",
-        nextStep:
-          "Definiera vilka 5–7 datapunkter som är viktigast för Travel Manager.",
-        votes: 1,
-      }),
-    ],
+    insights: [],
   },
   {
     id: "online-offline",
@@ -238,6 +211,7 @@ export function createInitialWorkshopState(): WorkshopState {
   return {
     event: workshopEvent,
     groups: initialGroups,
+    questions: responseConfigs,
     moderatorQuestions,
     commonThemes,
     updatedAt: new Date().toISOString(),
@@ -246,21 +220,23 @@ export function createInitialWorkshopState(): WorkshopState {
 
 export function calculateGroupProgress(
   responses: Record<ResponseKey, string>,
-  status: WorkshopGroup["status"]
+  status: WorkshopGroup["status"],
+  totalQuestions?: number
 ) {
+  const questionCount = Math.max(totalQuestions ?? Object.keys(responses).length, 1)
   const filledResponses = Object.values(responses).filter(
     (value) => value.trim().length > 0
   ).length
 
-  let progress = 10 + filledResponses * 22
+  let progress = 10 + Math.round((filledResponses / questionCount) * 70)
 
-  if (responses.improvements.trim().length > 0) {
-    progress += 12
+  if (responses.improvements?.trim().length > 0) {
+    progress += 10
   }
 
   if (status === "Redo för sammanfattning") {
-    progress = Math.max(progress, 92)
+    progress = 100
   }
 
-  return Math.min(100, progress)
+  return Math.min(100, Math.max(0, progress))
 }

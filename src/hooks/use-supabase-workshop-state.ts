@@ -6,20 +6,23 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/client"
 import {
   calculateGroupProgress,
   createInitialWorkshopState,
+  DEFAULT_EVENT_SLUG,
   responseConfigs,
 } from "@/lib/workshop-state"
 import type {
   AiInsightCardInput,
+  EventStatus,
   GroupStatus,
   ImpactLevel,
   InsightCard,
   DifficultyLevel,
   ResponseKey,
   WorkshopGroup,
+  WorkshopResponseConfig,
   WorkshopState,
 } from "@/types/workshop"
 
-const DEMO_EVENT_SLUG = "affarsresans-ekosystem"
+const EVENT_STORAGE_KEY = "workshop-live-current-event-slug"
 
 type EventRow = {
   id: string
@@ -28,7 +31,7 @@ type EventRow = {
   subtitle: string | null
   description: string
   event_date: string | null
-  status: "draft" | "active" | "completed" | "archived"
+  status: EventStatus
   moderator_questions: string[] | null
   common_themes: string[] | null
   updated_at: string
@@ -47,6 +50,18 @@ type GroupRow = {
   progress: number
   last_saved_at: string | null
   ready_at: string | null
+}
+
+type QuestionRow = {
+  id: string
+  event_id: string
+  response_key: string
+  title: string
+  description: string
+  placeholder: string
+  sort_order: number
+  is_required?: boolean
+  helper_text?: string
 }
 
 type ResponseRow = {
@@ -82,12 +97,27 @@ type SavePayload = {
   lastSavedAt: string
 }
 
-function createEmptyResponses(): Record<ResponseKey, string> {
-  return {
-    currentState: "",
-    friction: "",
-    improvements: "",
+function getInitialEventSlug() {
+  if (typeof window === "undefined") return DEFAULT_EVENT_SLUG
+
+  const params = new URLSearchParams(window.location.search)
+  const queryEvent = params.get("event")
+
+  if (queryEvent) {
+    window.localStorage.setItem(EVENT_STORAGE_KEY, queryEvent)
+    return queryEvent
   }
+
+  return window.localStorage.getItem(EVENT_STORAGE_KEY) || DEFAULT_EVENT_SLUG
+}
+
+function createEmptyResponses(
+  questions: WorkshopResponseConfig[]
+): Record<ResponseKey, string> {
+  return questions.reduce<Record<ResponseKey, string>>((result, question) => {
+    result[question.key] = ""
+    return result
+  }, {})
 }
 
 function createTitleFromText(text: string, fallback: string) {
@@ -97,20 +127,33 @@ function createTitleFromText(text: string, fallback: string) {
 
   const firstSentence = cleaned.split(/[.!?]/)[0]
 
-  if (firstSentence.length <= 70) {
-    return firstSentence
-  }
+  if (firstSentence.length <= 70) return firstSentence
 
   return `${firstSentence.slice(0, 67)}...`
 }
 
+function getPreferredResponse(group: WorkshopGroup, keys: string[]) {
+  for (const key of keys) {
+    const value = group.responses[key]?.trim()
+    if (value) return value
+  }
+
+  return ""
+}
+
 function buildInsightFromGroup(group: WorkshopGroup): AiInsightCardInput {
-  const currentState = group.responses.currentState.trim()
-  const friction = group.responses.friction.trim()
-  const improvements = group.responses.improvements.trim()
+  const currentState = getPreferredResponse(group, ["currentState", "nulage"])
+  const friction = getPreferredResponse(group, ["friction", "friktion"])
+  const improvements = getPreferredResponse(group, [
+    "improvements",
+    "forbattringar",
+    "solutions",
+  ])
+
+  const allText = Object.values(group.responses).filter(Boolean).join(" ")
 
   const title = createTitleFromText(
-    improvements || friction || group.topicTitle,
+    improvements || friction || allText || group.topicTitle,
     `Insikt från ${group.name}`
   )
 
@@ -120,7 +163,7 @@ function buildInsightFromGroup(group: WorkshopGroup): AiInsightCardInput {
       friction ||
       "Gruppen har identifierat ett område där processen behöver förtydligas.",
     consequence:
-      "Detta kan skapa mer manuell hantering, otydligt ansvar och svårare uppföljning för Travel Manager.",
+      "Detta kan skapa mer manuell hantering, otydligt ansvar och svårare uppföljning.",
     rootCause:
       currentState ||
       "Bakomliggande orsak behöver fördjupas av gruppen innan nästa steg.",
@@ -129,7 +172,7 @@ function buildInsightFromGroup(group: WorkshopGroup): AiInsightCardInput {
       "Formulera ett konkret förbättringsförslag som kan testas med utvalda parter.",
     impact: improvements.length > 40 ? "Hög" : "Medel",
     difficulty: friction.toLowerCase().includes("system") ? "Hög" : "Medel",
-    suggestedOwner: "Leverantör + resebyrå",
+    suggestedOwner: "Gemensamt ägarskap",
     nextStep:
       improvements ||
       "Definiera ansvarig part, önskad effekt och första praktiska test.",
@@ -139,11 +182,29 @@ function buildInsightFromGroup(group: WorkshopGroup): AiInsightCardInput {
 function mapRowsToState(
   eventRow: EventRow,
   groupRows: GroupRow[],
+  questionRows: QuestionRow[],
   responseRows: ResponseRow[],
   insightRows: InsightRow[]
 ): WorkshopState {
+  const questions: WorkshopResponseConfig[] =
+    questionRows.length > 0
+      ? questionRows
+          .slice()
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((question) => ({
+            dbId: question.id,
+            key: question.response_key,
+            title: question.title,
+            description: question.description,
+            placeholder: question.placeholder,
+            sortOrder: question.sort_order,
+            isRequired: question.is_required ?? true,
+            helperText: question.helper_text ?? "",
+          }))
+      : responseConfigs
+
   const groups = groupRows.map((groupRow) => {
-    const responses = createEmptyResponses()
+    const responses = createEmptyResponses(questions)
 
     responseRows
       .filter((response) => response.group_id === groupRow.id)
@@ -191,13 +252,16 @@ function mapRowsToState(
 
   return {
     event: {
-        name: eventRow.name,
-        subtitle: eventRow.subtitle ?? "",
-        date: eventRow.event_date ?? "Demo-event",
-        description: eventRow.description,
-        status: eventRow.status,
+      dbId: eventRow.id,
+      slug: eventRow.slug,
+      name: eventRow.name,
+      subtitle: eventRow.subtitle ?? "",
+      date: eventRow.event_date ?? "Demo-event",
+      description: eventRow.description,
+      status: eventRow.status,
     },
     groups,
+    questions,
     moderatorQuestions: eventRow.moderator_questions ?? [],
     commonThemes: eventRow.common_themes ?? [],
     updatedAt: eventRow.updated_at,
@@ -208,6 +272,7 @@ export function useSupabaseWorkshopState() {
   const supabase = useMemo(() => createSupabaseBrowserClient(), [])
   const saveTimeouts = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
 
+  const [eventSlug, setEventSlug] = useState(DEFAULT_EVENT_SLUG)
   const [state, setState] = useState<WorkshopState | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -215,19 +280,26 @@ export function useSupabaseWorkshopState() {
     "connecting" | "connected" | "disconnected"
   >("connecting")
 
+  useEffect(() => {
+    const slug = getInitialEventSlug()
+    setEventSlug(slug)
+  }, [])
+
   const fetchWorkshop = useCallback(
     async (showLoading = false) => {
-      if (showLoading) {
-        setIsLoading(true)
-      }
+      if (showLoading) setIsLoading(true)
 
       try {
         setError(null)
 
+        if (typeof window !== "undefined") {
+          window.localStorage.setItem(EVENT_STORAGE_KEY, eventSlug)
+        }
+
         const { data: eventData, error: eventError } = await supabase
           .from("events")
           .select("*")
-          .eq("slug", DEMO_EVENT_SLUG)
+          .eq("slug", eventSlug)
           .single()
 
         if (eventError) throw eventError
@@ -242,7 +314,16 @@ export function useSupabaseWorkshopState() {
 
         if (groupError) throw groupError
 
+        const { data: questionData, error: questionError } = await supabase
+          .from("questions")
+          .select("*")
+          .eq("event_id", eventRow.id)
+          .order("sort_order", { ascending: true })
+
+        if (questionError) throw questionError
+
         const groupRows = (groupData ?? []) as GroupRow[]
+        const questionRows = (questionData ?? []) as QuestionRow[]
         const groupDbIds = groupRows.map((group) => group.id)
 
         let responseRows: ResponseRow[] = []
@@ -269,7 +350,15 @@ export function useSupabaseWorkshopState() {
           insightRows = (insightData ?? []) as InsightRow[]
         }
 
-        setState(mapRowsToState(eventRow, groupRows, responseRows, insightRows))
+        setState(
+          mapRowsToState(
+            eventRow,
+            groupRows,
+            questionRows,
+            responseRows,
+            insightRows
+          )
+        )
       } catch (caughtError) {
         const message =
           caughtError instanceof Error
@@ -281,14 +370,14 @@ export function useSupabaseWorkshopState() {
         setIsLoading(false)
       }
     },
-    [supabase]
+    [eventSlug, supabase]
   )
 
   useEffect(() => {
     void fetchWorkshop(true)
 
     const channel = supabase
-      .channel("workshop-live-db-changes")
+      .channel(`workshop-live-db-changes-${eventSlug}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "events" },
@@ -297,6 +386,11 @@ export function useSupabaseWorkshopState() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "workshop_groups" },
+        () => void fetchWorkshop(false)
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "questions" },
         () => void fetchWorkshop(false)
       )
       .on(
@@ -310,10 +404,7 @@ export function useSupabaseWorkshopState() {
         () => void fetchWorkshop(false)
       )
       .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          setRealtimeStatus("connected")
-        }
-
+        if (status === "SUBSCRIBED") setRealtimeStatus("connected")
         if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           setRealtimeStatus("disconnected")
         }
@@ -323,15 +414,14 @@ export function useSupabaseWorkshopState() {
       setRealtimeStatus("disconnected")
       void supabase.removeChannel(channel)
     }
-  }, [fetchWorkshop, supabase])
+  }, [eventSlug, fetchWorkshop, supabase])
 
   const updateGroupResponse = useCallback(
     (groupId: string, key: ResponseKey, value: string) => {
       const currentGroup = state?.groups.find((group) => group.id === groupId)
+      const totalQuestions = state?.questions.length ?? 3
 
-      if (!currentGroup?.dbId) {
-        return
-      }
+      if (!currentGroup?.dbId) return
 
       const responses = {
         ...currentGroup.responses,
@@ -344,7 +434,11 @@ export function useSupabaseWorkshopState() {
           : "Aktiv"
 
       const lastSavedAt = new Date().toISOString()
-      const progress = calculateGroupProgress(responses, nextStatus)
+      const progress = calculateGroupProgress(
+        responses,
+        nextStatus,
+        totalQuestions
+      )
 
       const payloadToSave: SavePayload = {
         dbId: currentGroup.dbId,
@@ -580,7 +674,11 @@ export function useSupabaseWorkshopState() {
 
       if (!group) return
 
-      await createInsightCardFromData(groupId, buildInsightFromGroup(group), false)
+      await createInsightCardFromData(
+        groupId,
+        buildInsightFromGroup(group),
+        false
+      )
     },
     [createInsightCardFromData, state]
   )
@@ -642,12 +740,12 @@ export function useSupabaseWorkshopState() {
       setIsLoading(true)
       setError(null)
 
-      await supabase.from("events").delete().eq("slug", DEMO_EVENT_SLUG)
+      await supabase.from("events").delete().eq("slug", eventSlug)
 
       const { data: eventData, error: eventError } = await supabase
         .from("events")
         .insert({
-          slug: DEMO_EVENT_SLUG,
+          slug: eventSlug,
           name: initialState.event.name,
           subtitle: initialState.event.subtitle,
           description: initialState.event.description,
@@ -670,6 +768,8 @@ export function useSupabaseWorkshopState() {
         description: config.description,
         placeholder: config.placeholder,
         sort_order: index + 1,
+        is_required: config.isRequired ?? true,
+        helper_text: config.helperText ?? "",
       }))
 
       const { error: questionError } = await supabase
@@ -714,29 +814,6 @@ export function useSupabaseWorkshopState() {
 
           if (responseError) throw responseError
         }
-
-        if (group.insights.length > 0) {
-          const insightRows = group.insights.map((insight) => ({
-            group_id: groupRow.id,
-            title: insight.title,
-            problem: insight.problem,
-            consequence: insight.consequence,
-            root_cause: insight.rootCause,
-            idea: insight.idea,
-            impact: insight.impact,
-            difficulty: insight.difficulty,
-            suggested_owner: insight.suggestedOwner,
-            next_step: insight.nextStep,
-            votes: insight.votes,
-            ai_generated: insight.aiGenerated,
-          }))
-
-          const { error: insightError } = await supabase
-            .from("insight_cards")
-            .insert(insightRows)
-
-          if (insightError) throw insightError
-        }
       }
 
       await fetchWorkshop(false)
@@ -750,7 +827,7 @@ export function useSupabaseWorkshopState() {
     } finally {
       setIsLoading(false)
     }
-  }, [fetchWorkshop, supabase])
+  }, [eventSlug, fetchWorkshop, supabase])
 
   const groups = state?.groups ?? []
 
@@ -767,6 +844,7 @@ export function useSupabaseWorkshopState() {
   )
 
   return {
+    eventSlug,
     state,
     groups,
     allInsights,

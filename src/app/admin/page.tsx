@@ -62,6 +62,7 @@ function linesToArray(value: string) {
 
 export default function AdminPage() {
   const {
+    eventSlug,
     state,
     groups,
     syncNow,
@@ -108,7 +109,7 @@ export default function AdminPage() {
     const { data, error } = await supabase
       .from("events")
       .select("id")
-      .eq("slug", DEMO_EVENT_SLUG)
+      .eq("slug", eventSlug)
       .single()
 
     if (error) throw error
@@ -132,7 +133,7 @@ export default function AdminPage() {
           moderator_questions: linesToArray(moderatorQuestions),
           common_themes: linesToArray(commonThemes),
         })
-        .eq("slug", DEMO_EVENT_SLUG)
+        .eq("slug", eventSlug)
 
       if (error) throw error
 
@@ -590,11 +591,13 @@ export default function AdminPage() {
               </CardHeader>
               <CardContent className="space-y-3">
                 {[
-                  { label: "Deltagarvy", href: "/join" },
-                  { label: "Storbildsvy", href: "/present" },
-                  { label: "Moderatorvy", href: "/moderator" },
-                  { label: "Rapportvy", href: "/report/demo" },
-                  { label: "Event check", href: "/event-check" },
+                    { label: "Deltagarvy", href: `/join?event=${eventSlug}` },
+                    { label: "Storbildsvy", href: `/present?event=${eventSlug}` },
+                    { label: "Moderatorvy", href: `/moderator?event=${eventSlug}` },
+                    { label: "Rapportvy", href: `/report/demo?event=${eventSlug}` },
+                    { label: "Event check", href: "/event-check" },
+                    { label: "Event Designer", href: `/designer?event=${eventSlug}` },
+                    { label: "Alla events", href: "/events" },
                 ].map((link) => (
                   <div
                     key={link.href}
