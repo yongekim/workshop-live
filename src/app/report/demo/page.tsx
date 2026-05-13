@@ -211,6 +211,10 @@ export default function DemoReportPage() {
     }
   }
 
+  function downloadProfessionalPdf() {
+    window.open(`/api/report/pdf?event=${eventSlug}`, "_blank")
+  }
+
   function exportMarkdown() {
     downloadTextFile({
       filename: "workshoprapport.md",
@@ -278,6 +282,11 @@ export default function DemoReportPage() {
             <Button variant="secondary" onClick={exportActionsCsv}>
               <ClipboardList className="mr-2 h-4 w-4" />
               Exportera actions CSV
+            </Button>
+
+            <Button variant="secondary" onClick={downloadProfessionalPdf}>
+              <Download className="mr-2 h-4 w-4" />
+              Ladda ner PDF
             </Button>
 
             <Button onClick={() => window.print()}>

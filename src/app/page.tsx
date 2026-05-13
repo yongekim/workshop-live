@@ -1,14 +1,17 @@
 import Link from "next/link"
 import {
   ArrowRight,
-  BarChart3,
   BrainCircuit,
+  CalendarDays,
   FileText,
-  QrCode,
+  LayoutDashboard,
+  Presentation,
+  ShieldCheck,
   Sparkles,
   Users,
 } from "lucide-react"
 
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -17,79 +20,82 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
 
-const features = [
+const primaryLinks = [
   {
-    title: "Deltagarvy via QR-kod",
-    description:
-      "Grupperna ansluter snabbt, väljer sitt workshopspår och börjar arbeta direkt.",
-    icon: QrCode,
+    title: "Event Hub",
+    description: "Skapa och hantera flera workshops från mallar.",
+    href: "/events",
+    icon: CalendarDays,
+    cta: "Öppna events",
   },
   {
-    title: "AI-stött grupparbete",
-    description:
-      "Diskreta AI-knappar hjälper grupperna att fördjupa, konkretisera och se frågan ur Travel Manager-perspektiv.",
+    title: "Admin",
+    description: "Styr event, grupper, deltagare och skarp körning.",
+    href: "/admin",
+    icon: LayoutDashboard,
+    cta: "Öppna admin",
+  },
+  {
+    title: "Deltagarvy",
+    description: "QR- och länkflöde för workshopdeltagare.",
+    href: "/join",
+    icon: Users,
+    cta: "Öppna join",
+  },
+  {
+    title: "Moderator",
+    description: "Följ grupparbetet live och kör AI-analys.",
+    href: "/moderator",
     icon: BrainCircuit,
-  },
-  {
-    title: "Moderator-cockpit",
-    description:
-      "Moderatorn ser gruppers framsteg, återkommande teman och förslag på följdfrågor live.",
-    icon: BarChart3,
-  },
-  {
-    title: "Rapport och uppföljning",
-    description:
-      "Workshopens insikter omvandlas till sammanfattning, prioriterade actions och rapportunderlag.",
-    icon: FileText,
+    cta: "Öppna moderator",
   },
 ]
 
-export default function Home() {
+const secondaryLinks = [
+  {
+    label: "Storbildsvy",
+    href: "/present",
+    icon: Presentation,
+  },
+  {
+    label: "Rapport",
+    href: "/report/demo",
+    icon: FileText,
+  },
+  {
+    label: "Event check",
+    href: "/event-check",
+    icon: ShieldCheck,
+  },
+]
+
+export default function HomePage() {
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <section className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-6 py-8">
-        <header className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-slate-950 shadow-lg">
-              <Sparkles className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-slate-300">
-                Workshop Live
-              </p>
-              <p className="text-xs text-slate-500">
-                AI-stödd workshopplattform
-              </p>
-            </div>
-          </div>
+    <main className="min-h-screen bg-slate-950 px-6 py-8 text-white">
+      <section className="mx-auto max-w-7xl">
+        <div className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.06] p-8 shadow-2xl md:p-12">
+          <div className="absolute right-[-120px] top-[-120px] h-80 w-80 rounded-full bg-cyan-400/20 blur-3xl" />
+          <div className="absolute bottom-[-160px] left-[-140px] h-96 w-96 rounded-full bg-blue-500/10 blur-3xl" />
 
-          <Badge className="rounded-full bg-white/10 px-4 py-2 text-slate-200 hover:bg-white/10">
-            MVP Preview
-          </Badge>
-        </header>
-
-        <div className="grid flex-1 items-center gap-12 py-16 lg:grid-cols-[1.1fr_0.9fr]">
-          <div>
+          <div className="relative">
             <Badge className="mb-6 rounded-full bg-cyan-400/10 px-4 py-2 text-cyan-200 hover:bg-cyan-400/10">
-              Business Travel Insight Lab
+              Workshop Live
             </Badge>
 
-            <h1 className="max-w-4xl text-5xl font-semibold tracking-tight text-white md:text-7xl">
-              Gör workshops smartare, tydligare och mer användbara efteråt.
+            <h1 className="max-w-5xl text-5xl font-semibold tracking-tight md:text-7xl">
+              AI-stödd workshopplattform för livegrupper, moderator och rapport.
             </h1>
 
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-300">
-              En modern workshopmotor där grupper arbetar strukturerat,
-              AI hjälper till att fördjupa insikter och moderatorn får en
-              livebild av teman, idéer och nästa steg.
+            <p className="mt-6 max-w-3xl text-lg leading-8 text-slate-300 md:text-xl md:leading-9">
+              Skapa events från mallar, låt deltagare arbeta i grupper, följ
+              insikter live och generera professionella rapportunderlag.
             </p>
 
-            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-8 flex flex-wrap gap-3">
               <Button asChild size="lg" className="rounded-full">
-                <Link href="/join">
-                  Starta deltagarvy
+                <Link href="/events">
+                  Starta i Event Hub
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
               </Button>
@@ -100,118 +106,113 @@ export default function Home() {
                 variant="outline"
                 className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
               >
-                <Link href="/moderator">
-                  Öppna moderatorvy
-                </Link>
-              </Button>
-
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-              >
-                <Link href="/present">Storbildsvy</Link>
-              </Button>
-
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-              >
-                <Link href="/admin">Admin</Link>
-              </Button>
-
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-              >
-                <Link href="/events">Events</Link>
-              </Button>
-              
-              <Button
-                asChild
-                size="lg"
-                variant="outline"
-                className="rounded-full border-white/15 bg-white/5 text-white hover:bg-white/10 hover:text-white"
-              >
-                <Link href="/event-check">Event check</Link>
+                <Link href="/event-check">Kör event check</Link>
               </Button>
             </div>
           </div>
-
-
-
-          <Card className="border-white/10 bg-white/10 text-white shadow-2xl backdrop-blur">
-            <CardHeader>
-              <CardDescription className="text-slate-300">
-                Första eventet
-              </CardDescription>
-              <CardTitle className="text-2xl">
-                Affärsresans ekosystem
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent className="space-y-5">
-              <div className="rounded-2xl border border-white/10 bg-slate-950/50 p-5">
-                <div className="mb-3 flex items-center gap-2 text-sm text-slate-300">
-                  <Users className="h-4 w-4" />
-                  Workshopformat
-                </div>
-                <p className="text-sm leading-6 text-slate-300">
-                  3–5 grupper djupdyker i frågor kring resebyråer,
-                  leverantörer, Travel Managers, avtalspriser, bokningsflöden,
-                  betalning, policy och uppföljning.
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl bg-white/10 p-4">
-                  <p className="text-3xl font-semibold">20+</p>
-                  <p className="mt-1 text-sm text-slate-300">Deltagare</p>
-                </div>
-
-                <div className="rounded-2xl bg-white/10 p-4">
-                  <p className="text-3xl font-semibold">5</p>
-                  <p className="mt-1 text-sm text-slate-300">Workshopspår</p>
-                </div>
-              </div>
-
-              <Button asChild className="w-full rounded-full">
-                <Link href="/report/demo">
-                  Visa rapportvy
-                  <FileText className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            </CardContent>
-          </Card>
         </div>
 
-        <section className="grid gap-4 pb-10 md:grid-cols-2 lg:grid-cols-4">
-          {features.map((feature) => {
-            const Icon = feature.icon
+        <div className="mt-8 grid gap-5 md:grid-cols-2 lg:grid-cols-4">
+          {primaryLinks.map((item) => {
+            const Icon = item.icon
 
             return (
               <Card
-                key={feature.title}
+                key={item.href}
                 className="border-white/10 bg-white/[0.06] text-white"
               >
                 <CardHeader>
-                  <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-2xl bg-white/10">
-                    <Icon className="h-5 w-5" />
+                  <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-cyan-400/10">
+                    <Icon className="h-5 w-5 text-cyan-200" />
                   </div>
-                  <CardTitle className="text-base">{feature.title}</CardTitle>
-                  <CardDescription className="leading-6 text-slate-300">
-                    {feature.description}
+
+                  <CardTitle>{item.title}</CardTitle>
+                  <CardDescription className="text-slate-400">
+                    {item.description}
                   </CardDescription>
                 </CardHeader>
+
+                <CardContent>
+                  <Button asChild variant="secondary" className="w-full rounded-full">
+                    <Link href={item.href}>
+                      {item.cta}
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                </CardContent>
               </Card>
             )
           })}
-        </section>
+        </div>
+
+        <div className="mt-8 grid gap-5 lg:grid-cols-[1fr_380px]">
+          <Card className="border-white/10 bg-white/[0.06] text-white">
+            <CardHeader>
+              <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+                <Sparkles className="h-5 w-5 text-cyan-200" />
+              </div>
+              <CardTitle>Rekommenderat arbetsflöde</CardTitle>
+              <CardDescription className="text-slate-400">
+                Använd detta inför varje skarpt event.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="grid gap-3 md:grid-cols-2">
+              {[
+                "Skapa event från mall i Event Hub.",
+                "Justera frågor och eventstatus i Event Designer.",
+                "Öppna storbildsvyn och visa QR-koden.",
+                "Låt deltagare registrera sig och välja grupp.",
+                "Följ arbetet live i moderatorvyn.",
+                "Generera rapport och ladda ner PDF/CSV.",
+              ].map((step, index) => (
+                <div
+                  key={step}
+                  className="rounded-2xl border border-white/10 bg-slate-950/50 p-4"
+                >
+                  <p className="text-xs uppercase tracking-wide text-cyan-200">
+                    Steg {index + 1}
+                  </p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    {step}
+                  </p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card className="border-white/10 bg-white/[0.06] text-white">
+            <CardHeader>
+              <CardTitle>Snabblänkar</CardTitle>
+              <CardDescription className="text-slate-400">
+                Direkt till vanliga vyer.
+              </CardDescription>
+            </CardHeader>
+
+            <CardContent className="space-y-3">
+              {secondaryLinks.map((item) => {
+                const Icon = item.icon
+
+                return (
+                  <Button
+                    key={item.href}
+                    asChild
+                    variant="secondary"
+                    className="w-full justify-between rounded-full"
+                  >
+                    <Link href={item.href}>
+                      <span className="flex items-center">
+                        <Icon className="mr-2 h-4 w-4" />
+                        {item.label}
+                      </span>
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                )
+              })}
+            </CardContent>
+          </Card>
+        </div>
       </section>
     </main>
   )
