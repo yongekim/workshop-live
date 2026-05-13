@@ -3,10 +3,16 @@
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowRight, QrCode, Search, Users } from "lucide-react"
+import { ArrowRight, CheckCircle2, QrCode, Search, Users } from "lucide-react"
 import { QRCodeSVG } from "qrcode.react"
 
 import { useSupabaseWorkshopState } from "@/hooks/use-supabase-workshop-state"
+import { createSupabaseBrowserClient } from "@/lib/supabase/client"
+import {
+  getParticipantProfile,
+  saveParticipantProfile,
+  type ParticipantProfile,
+} from "@/lib/participants/participant-session"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,20 +25,44 @@ import {
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 
+const DEMO_EVENT_SLUG = "affarsresans-ekosystem"
+
 export default function JoinPage() {
   const router = useRouter()
+  const supabase = useMemo(() => createSupabaseBrowserClient(), [])
   const { state, groups, error, isLoading, syncNow } =
     useSupabaseWorkshopState()
 
   const [origin, setOrigin] = useState("")
   const [groupCode, setGroupCode] = useState("")
   const [codeError, setCodeError] = useState("")
+  const [joinError, setJoinError] = useState("")
+  const [isJoining, setIsJoining] = useState(false)
+
+  const [name, setName] = useState("")
+  const [company, setCompany] = useState("")
+  const [email, setEmail] = useState("")
+  const [profile, setProfile] = useState<ParticipantProfile | null>(null)
 
   useEffect(() => {
     setOrigin(window.location.origin)
+
+    const storedProfile = getParticipantProfile()
+
+    if (storedProfile) {
+      setProfile(storedProfile)
+      setName(storedProfile.name)
+      setCompany(storedProfile.company)
+      setEmail(storedProfile.email)
+    }
   }, [])
 
   const joinUrl = origin ? `${origin}/join` : "/join"
+
+  const isProfileComplete =
+    name.trim().length > 1 &&
+    company.trim().length > 1 &&
+    email.trim().includes("@")
 
   const matchingGroup = useMemo(() => {
     const normalized = groupCode.trim().toUpperCase()
@@ -48,6 +78,96 @@ export default function JoinPage() {
     )
   }, [groupCode, groups])
 
+  function saveProfile() {
+    setJoinError("")
+
+    if (!isProfileComplete) {
+      setJoinError("Fyll i namn, företag och en giltig e-postadress.")
+      return null
+    }
+
+    const savedProfile = saveParticipantProfile({
+      name,
+      company,
+      email,
+    })
+
+    setProfile(savedProfile)
+
+    return savedProfile
+  }
+
+  async function joinGroup(groupId: string) {
+    try {
+      setIsJoining(true)
+      setJoinError("")
+      setCodeError("")
+
+      const currentProfile = profile ?? saveProfile()
+
+      if (!currentProfile) return
+
+      const group = groups.find((item) => item.id === groupId)
+
+      if (!group?.dbId) {
+        setJoinError("Kunde inte hitta gruppens databas-ID.")
+        return
+      }
+
+      const { data: eventData, error: eventError } = await supabase
+        .from("events")
+        .select("id")
+        .eq("slug", DEMO_EVENT_SLUG)
+        .single()
+
+      if (eventError) throw eventError
+
+      const { error: participantError } = await supabase
+        .from("participants")
+        .upsert(
+          {
+            event_id: eventData.id,
+            group_id: group.dbId,
+            participant_session_id: currentProfile.sessionId,
+            name: currentProfile.name,
+            company: currentProfile.company,
+            email: currentProfile.email,
+          },
+          {
+            onConflict: "event_id,participant_session_id",
+          }
+        )
+
+      if (participantError) throw participantError
+
+      const { count, error: countError } = await supabase
+        .from("participants")
+        .select("id", { count: "exact", head: true })
+        .eq("group_id", group.dbId)
+
+      if (countError) throw countError
+
+      if (typeof count === "number") {
+        await supabase
+          .from("workshop_groups")
+          .update({ participants: count })
+          .eq("id", group.dbId)
+      }
+
+      await syncNow(false)
+      router.push(`/group/${group.id}`)
+    } catch (caughtError) {
+      const message =
+        caughtError instanceof Error
+          ? caughtError.message
+          : "Kunde inte registrera deltagaren."
+
+      setJoinError(message)
+    } finally {
+      setIsJoining(false)
+    }
+  }
+
   function enterGroupByCode() {
     setCodeError("")
 
@@ -61,7 +181,7 @@ export default function JoinPage() {
       return
     }
 
-    router.push(`/group/${matchingGroup.id}`)
+    void joinGroup(matchingGroup.id)
   }
 
   if (!state) {
@@ -99,15 +219,70 @@ export default function JoinPage() {
             </Badge>
 
             <h1 className="text-4xl font-semibold tracking-tight md:text-6xl">
-              Välj din workshopgrupp
+              Välkommen till workshopen
             </h1>
 
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-              Välkommen till {state.event.name}. Ange din gruppkod eller välj
-              gruppen du tillhör.
+              Välkommen till {state.event.name}. Fyll i dina uppgifter och välj
+              sedan din workshopgrupp.
             </p>
 
             <Card className="mt-8 max-w-2xl border-white/10 bg-white/[0.06] text-white">
+              <CardHeader>
+                <CardTitle>Dina uppgifter</CardTitle>
+                <CardDescription className="text-slate-400">
+                  Detta används för deltagarlista och uppföljning efter
+                  workshopen.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <Input
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    placeholder="Namn"
+                    className="border-white/10 bg-slate-950/70 text-white"
+                  />
+                  <Input
+                    value={company}
+                    onChange={(event) => setCompany(event.target.value)}
+                    placeholder="Företag"
+                    className="border-white/10 bg-slate-950/70 text-white"
+                  />
+                  <Input
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="E-post"
+                    className="border-white/10 bg-slate-950/70 text-white"
+                  />
+                </div>
+
+                <Button
+                  variant="secondary"
+                  className="rounded-full"
+                  onClick={saveProfile}
+                  disabled={!isProfileComplete}
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Spara mina uppgifter
+                </Button>
+
+                {profile && (
+                  <p className="text-sm text-cyan-200">
+                    Registrerad som {profile.name}, {profile.company}
+                  </p>
+                )}
+
+                {joinError && (
+                  <p className="rounded-2xl bg-red-500/10 p-4 text-sm leading-6 text-red-200">
+                    {joinError}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="mt-5 max-w-2xl border-white/10 bg-white/[0.06] text-white">
               <CardHeader>
                 <CardTitle>Gå direkt till grupp</CardTitle>
                 <CardDescription className="text-slate-400">
@@ -126,11 +301,21 @@ export default function JoinPage() {
                     className="border-white/10 bg-slate-950/70 text-white"
                   />
 
-                  <Button className="rounded-full" onClick={enterGroupByCode}>
+                  <Button
+                    className="rounded-full"
+                    onClick={enterGroupByCode}
+                    disabled={!isProfileComplete || isJoining}
+                  >
                     <Search className="mr-2 h-4 w-4" />
                     Gå vidare
                   </Button>
                 </div>
+
+                {!isProfileComplete && (
+                  <p className="mt-3 text-sm text-slate-400">
+                    Fyll först i namn, företag och e-post.
+                  </p>
+                )}
 
                 {matchingGroup && (
                   <p className="mt-3 text-sm text-cyan-200">
@@ -204,12 +389,20 @@ export default function JoinPage() {
                   <Progress value={group.progress} />
                 </div>
 
-                <Button asChild className="w-full rounded-full">
-                  <Link href={`/group/${group.id}`}>
-                    Gå till gruppen
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
+                <Button
+                  className="w-full rounded-full"
+                  disabled={!isProfileComplete || isJoining}
+                  onClick={() => joinGroup(group.id)}
+                >
+                  Gå till gruppen
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
+
+                {!isProfileComplete && (
+                  <p className="mt-3 text-center text-xs text-slate-500">
+                    Fyll först i dina uppgifter ovan.
+                  </p>
+                )}
               </CardContent>
             </Card>
           ))}

@@ -12,7 +12,6 @@ export async function GET() {
     openAiModelConfigured: Boolean(process.env.OPENAI_MODEL),
     adminPasswordConfigured: Boolean(process.env.ADMIN_PASSWORD),
     moderatorPasswordConfigured: Boolean(process.env.MODERATOR_PASSWORD),
-    eventAccessCodeConfigured: Boolean(process.env.EVENT_ACCESS_CODE),
     databaseReachable: false,
     demoEventFound: false,
   }
